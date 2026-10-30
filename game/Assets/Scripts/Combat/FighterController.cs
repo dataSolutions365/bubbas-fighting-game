@@ -55,8 +55,19 @@ namespace Bubba.Combat
         public float DistanceToOpponent => opponent == null ? float.MaxValue : Mathf.Abs(opponent.transform.position.x - transform.position.x);
         public bool IsAttackWindingUp => CurrentState == State.Attacking && !attackResolved;
 
+        /// The attack currently playing (valid while CurrentState is Attacking).
+        public AttackSpec CurrentAttack => pendingAttack;
+        /// When the current attack's hit lands and when its recovery ends (Time.time).
+        public float AttackHitTime => attackHitsAt;
+        public float AttackEndTime => stateUntil;
+
         /// attacker, damage dealt, was blocked, was parried
         public event Action<FighterController, float, bool, bool> GotHit;
+        /// Fired when an attack starts winding up.
+        public event Action<AttackSpec> AttackStarted;
+        /// Fired at the moment of impact: true if it connected, false if it missed or was dodged/parried.
+        public event Action<AttackSpec, bool> AttackResolved;
+        public event Action Dodged;
 
         private IFighterInput input;
         private AbilityRunner abilities;
@@ -213,6 +224,7 @@ namespace Bubba.Combat
             attackLanded = false;
             CurrentState = State.Attacking;
             Animate(spec.name.StartsWith("Light") ? "Light" : spec.name);
+            AttackStarted?.Invoke(spec);
         }
 
         private void TickAttack(FighterCommand cmd)
@@ -237,12 +249,18 @@ namespace Bubba.Combat
         private void ResolveAttack()
         {
             attackResolved = true;
-            if (opponent == null || DistanceToOpponent > pendingAttack.range) return;
+            if (opponent == null || DistanceToOpponent > pendingAttack.range)
+            {
+                lightChain = 0;
+                AttackResolved?.Invoke(pendingAttack, false);
+                return;
+            }
             var spec = pendingAttack;
             spec.damage *= stats.power * PowerMultiplier;
             attackLanded = opponent.ReceiveHit(this, spec);
             if (attackLanded && spec.name.StartsWith("Light")) lastLightLandedAt = Time.time;
             if (!attackLanded) lightChain = 0;
+            AttackResolved?.Invoke(pendingAttack, attackLanded);
         }
 
         /// Returns true if the hit connected (blocked hits count; dodged and parried don't).
@@ -306,6 +324,7 @@ namespace Bubba.Combat
             // Dodge away unless the stick is held toward the opponent (Medium: roll through).
             dodgeDirection = cmd.towardOpponent > 0 ? FacingSign : -FacingSign;
             Animate("Dodge");
+            Dodged?.Invoke();
         }
 
         private void TickDodge()
