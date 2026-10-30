@@ -1,0 +1,69 @@
+{
+  "fighters": {
+    "bear": {
+      "name": "Grizzly Bear",
+      "species": "Ursus arctos horribilis",
+      "baseStats": { "health": 1200, "speed": 0.8, "power": 1.3 },
+      "premiumOnly": false,
+      "enabled": true
+    },
+    "gorilla": {
+      "name": "Silverback Gorilla",
+      "species": "Gorilla beringei",
+      "baseStats": { "health": 1000, "speed": 1.0, "power": 1.1 },
+      "premiumOnly": false,
+      "enabled": true
+    },
+    "lion": {
+      "name": "African Lion",
+      "species": "Panthera leo",
+      "baseStats": { "health": 900, "speed": 1.25, "power": 1.0 },
+      "premiumOnly": true,
+      "enabled": false
+    }
+  },
+  "abilities": {
+    "roar": {
+      "name": "Roar",
+      "description": "Staggers the opponent for a moment if they are close.",
+      "cost": 50, "tier": 1, "fighterId": "any", "premiumOnly": false,
+      "cooldownSec": 12, "damage": 0, "version": 1, "enabled": true
+    },
+    "pounce": {
+      "name": "Pounce",
+      "description": "Leap forward and strike from mid range.",
+      "cost": 50, "tier": 1, "fighterId": "any", "premiumOnly": false,
+      "cooldownSec": 8, "damage": 70, "version": 1, "enabled": true
+    },
+    "charge": {
+      "name": "Charge",
+      "description": "Run through the opponent, knocking them down.",
+      "cost": 80, "tier": 1, "fighterId": "any", "premiumOnly": false,
+      "cooldownSec": 10, "damage": 90, "version": 1, "enabled": true
+    },
+    "thick-hide": {
+      "name": "Thick Hide",
+      "description": "Take half damage for 4 seconds.",
+      "cost": 120, "tier": 2, "fighterId": "any", "premiumOnly": false,
+      "cooldownSec": 20, "damage": 0, "version": 1, "enabled": true
+    },
+    "maul": {
+      "name": "Maul",
+      "description": "Bear only. A grab followed by three heavy swipes.",
+      "cost": 150, "tier": 2, "fighterId": "bear", "premiumOnly": false,
+      "cooldownSec": 15, "damage": 180, "version": 1, "enabled": true
+    },
+    "chest-beat": {
+      "name": "Chest Beat",
+      "description": "Gorilla only. Raises power by 30% for 6 seconds.",
+      "cost": 150, "tier": 2, "fighterId": "gorilla", "premiumOnly": false,
+      "cooldownSec": 18, "damage": 0, "version": 1, "enabled": true
+    },
+    "frenzy": {
+      "name": "Frenzy",
+      "description": "Premium. Attacks are 40% faster for 5 seconds.",
+      "cost": 250, "tier": 3, "fighterId": "any", "premiumOnly": true,
+      "cooldownSec": 25, "damage": 0, "version": 1, "enabled": true
+    }
+  }
+}

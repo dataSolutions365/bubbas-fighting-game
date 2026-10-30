@@ -1,0 +1,53 @@
+# ---------- Unity (project lives in game/) ----------
+game/[Ll]ibrary/
+game/[Tt]emp/
+game/[Oo]bj/
+game/[Bb]uild/
+game/[Bb]uilds/
+game/[Ll]ogs/
+game/[Uu]ser[Ss]ettings/
+game/[Mm]emoryCaptures/
+game/[Rr]ecordings/
+game/Assets/Plugins/Editor/JetBrains*
+game/.vs/
+game/.vscode/
+game/.idea/
+game/*.csproj
+game/*.sln
+game/*.slnx
+game/*.suo
+game/*.user
+game/*.userprefs
+game/*.pidb
+game/*.booproj
+game/*.svd
+game/*.pdb
+game/*.mdb
+game/*.opendb
+game/*.VC.db
+game/*.apk
+game/*.aab
+game/*.unitypackage
+game/crashlytics-build.properties
+
+# Firebase config files contain project keys; keep them local.
+game/Assets/google-services.json
+game/Assets/GoogleService-Info.plist
+game/Assets/StreamingAssets/google-services-desktop.json
+
+# ---------- Firebase / Node ----------
+firebase/.firebaserc
+firebase/functions/node_modules/
+firebase/functions/lib/
+firebase/*-debug.log
+firebase/.firebase/
+*.log
+service-account*.json
+
+# ---------- OS / editors ----------
+.DS_Store
+Thumbs.db
+.vs/
+firebase/functions/.env
+ci/bin/
+ci/obj/
