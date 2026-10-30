@@ -45,6 +45,8 @@ namespace Bubba.Prototype
                     break;
                 default:
                     DrawFight();
+                    DrawWorldLabels();
+                    DrawControlsCard();
                     if (rounds.CurrentPhase == RoundManager.Phase.MatchOver) DrawResult(session);
                     break;
             }
@@ -157,12 +159,7 @@ namespace Bubba.Prototype
             var router = rounds.player.GetComponent<PlayerInputRouter>();
             var activeScheme = router != null ? router.scheme : scheme;
 
-            if (activeScheme == ControlScheme.Easy)
-            {
-                GUI.Label(new Rect(20 * u, Screen.height - 50 * u, Screen.width * 0.6f, 40 * u),
-                    "Tap: attack   Swipe toward: heavy   Swipe away: dodge   Hold: block", small);
-            }
-            else
+            if (activeScheme != ControlScheme.Easy)
             {
                 DrawButton(TouchLayout.Light, "Light");
                 DrawButton(TouchLayout.Heavy, "Heavy");
@@ -192,6 +189,65 @@ namespace Bubba.Prototype
                 DrawButton(TouchLayout.Special(i, activeScheme), text);
                 GUI.enabled = true;
             }
+        }
+
+        /// "YOU" / "CPU" over the fighters, plus floating hit numbers.
+        private void DrawWorldLabels()
+        {
+            var cam = Camera.main;
+            if (cam == null) return;
+            DrawWorldText(cam, rounds.player.transform.position + Vector3.up * 2.6f, "YOU", new Color(1f, 0.85f, 0.4f), 0.8f, 1f);
+            DrawWorldText(cam, rounds.enemy.transform.position + Vector3.up * 2.6f, "CPU", new Color(0.7f, 0.8f, 1f), 0.8f, 1f);
+
+            CombatText.Prune();
+            foreach (var e in CombatText.Entries)
+            {
+                float age = (Time.time - e.bornAt) / CombatText.Lifetime;
+                DrawWorldText(cam, e.world + Vector3.up * (age * 0.8f), e.text, e.color, e.size, 1f - age * age);
+            }
+        }
+
+        private void DrawWorldText(Camera cam, Vector3 world, string text, Color color, float size, float alpha)
+        {
+            Vector3 sp = cam.WorldToScreenPoint(world);
+            if (sp.z <= 0f) return;
+            var style = new GUIStyle(big) { fontSize = Mathf.RoundToInt(30 * u * size) };
+            var r = new Rect(sp.x - 150 * u, Screen.height - sp.y - 25 * u, 300 * u, 50 * u);
+            var shadow = new Rect(r.x + 2, r.y + 2, r.width, r.height);
+            GUI.color = new Color(0f, 0f, 0f, alpha * 0.8f);
+            GUI.Label(shadow, text, style);
+            GUI.color = new Color(color.r, color.g, color.b, alpha);
+            GUI.Label(r, text, style);
+            GUI.color = Color.white;
+        }
+
+        /// A small always-visible reminder of the controls during a fight.
+        private void DrawControlsCard()
+        {
+            var router = rounds.player.GetComponent<PlayerInputRouter>();
+            var activeScheme = router != null ? router.scheme : scheme;
+            string text;
+            if (Application.isEditor)
+            {
+                text = "KEYBOARD\nA / D   move\nJ   punch (tap fast to combo)\nK   heavy  (toward + K = lunge, away + K = uppercut)\nhold L   block (just before a hit = PARRY)\nSpace   dodge\n1 / 2   special abilities";
+            }
+            else if (activeScheme == ControlScheme.Easy)
+            {
+                text = "Tap: punch   Swipe toward: heavy   Swipe away: dodge\nHold: block   Buttons: specials";
+            }
+            else
+            {
+                text = "Left side: drag to move\nForward + Heavy = lunge   Back + Heavy = uppercut\nBlock just before a hit to PARRY";
+            }
+
+            var style = new GUIStyle(small) { alignment = TextAnchor.UpperLeft };
+            float w = Screen.width * 0.42f;
+            float h = style.CalcHeight(new GUIContent(text), w - 20 * u) + 20 * u;
+            var r = new Rect(20 * u, 110 * u, w, h);
+            GUI.color = new Color(0f, 0f, 0f, 0.55f);
+            GUI.DrawTexture(r, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(r.x + 10 * u, r.y + 10 * u, r.width - 20 * u, r.height - 20 * u), text, style);
         }
 
         private void DrawResult(GameSession session)

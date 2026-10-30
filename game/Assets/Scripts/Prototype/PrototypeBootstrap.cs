@@ -23,7 +23,7 @@ namespace Bubba.Prototype
 
             BuildStage();
             var player = BuildFighter("Player", new Color(0.45f, 0.3f, 0.18f), -2.5f);
-            var enemy = BuildFighter("Enemy", new Color(0.25f, 0.25f, 0.28f), 2.5f);
+            var enemy = BuildFighter("Enemy", new Color(0.3f, 0.36f, 0.55f), 2.5f);
             player.opponent = enemy;
             enemy.opponent = player;
             player.SetInput(player.gameObject.AddComponent<PlayerInputRouter>());
@@ -94,6 +94,10 @@ namespace Bubba.Prototype
             snout.transform.localScale = new Vector3(0.35f, 0.25f, 0.4f);
             Object.Destroy(snout.GetComponent<Collider>());
             snout.GetComponent<Renderer>().material.color = color * 0.7f;
+
+            var visuals = root.AddComponent<FighterVisuals>();
+            visuals.body = body.GetComponent<Renderer>();
+            visuals.baseColor = color;
 
             return fighter;
         }
