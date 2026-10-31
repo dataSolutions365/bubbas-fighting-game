@@ -13,7 +13,7 @@ prototype scope: [Animal Fighting Game: Plan](https://claude.ai/artifact/XfrVDDy
 | --- | --- |
 | `game/` | The Unity project. Game code is in `game/Assets/Scripts`. |
 | `firebase/` | Firestore security rules, Cloud Functions (points, shop, matches) and the starter catalog of fighters and abilities. |
-| `game/Assets/Art/Monkey/` | The hand-drawn boxing monkey, colored, plus the same drawing cut into body parts for animation. |
+| `game/Assets/Resources/Monkey/` | The hand-drawn boxing monkey, colored, plus the same drawing cut into body parts. The prototype fight loads it from here (Unity only loads files by name from `Resources` folders). |
 | `prototypes/monkey-punch/` | Quick browser game tests (Phaser) using the monkey. Open any `.html` file in `games/` in a web browser. |
 | `ci/` | A compile check that lets GitHub build the C# scripts without Unity. |
 
@@ -58,6 +58,14 @@ In the Unity editor you can also use the keyboard: **A/D** move, **J** light, **
 Until Firebase is connected, the game uses an offline stand-in for the server, so you can play right away. Points then only last until you stop the game.
 
 To try the touch controls, run the game on your phone using [Unity Remote](https://docs.unity3d.com/Manual/UnityRemote5.html) or build an Android APK.
+
+### The monkey
+
+The prototype draws both fighters as the hand-drawn boxing monkey from `game/Assets/Resources/Monkey`. The CPU monkey is tinted blue. The monkey jabs with his front arm, switches to the punch drawing for heavy hits, puts his gloves up to block, and wobbles and falls over when hurt. To go back to capsules, untick **Use Monkey Art** on the Prototype Bootstrap component.
+
+For crisper edges, select the images in `Resources/Monkey` in Unity and set **Texture Type** to **Sprite (2D and UI)**.
+
+New characters work the same way. Each one needs a drawing on a full-size canvas, cut into body, head, front arm and back arm pieces that line up when stacked, plus the shoulder and neck pivot points.
 
 ### Swapping in real animals
 
