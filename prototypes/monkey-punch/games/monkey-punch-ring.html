@@ -1,0 +1,513 @@
+<title>Monkey Punch Ring</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;600&display=swap">
+<style>
+/* Layout: arcade cabinet. Angled ring view on top, thumb stick left and punch buttons right underneath. Single dark arena look by choice. */
+:root {
+  --night: #0d1220;
+  --panel: #161d31;
+  --edge: #2b3555;
+  --glove: #ff4d3d;
+  --gold: #ffd23f;
+  --ink: #f3ead8;
+  --muted: #9aa3bd;
+  --display: "Bungee", Impact, "Arial Black", sans-serif;
+  --body: "Rubik", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--night); color: var(--ink); font-family: var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 10px 14px; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; gap: 10px; overflow-x: hidden;
+}
+header { display: flex; align-items: baseline; justify-content: space-between; width: 100%; max-width: 440px; gap: 12px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: 1.3rem; margin: 0; color: var(--gold); text-wrap: balance; }
+header p { margin: 0; font-size: .8rem; color: var(--muted); }
+#game {
+  width: min(100%, 440px, calc((100dvh - 230px) * 0.8333));
+  aspect-ratio: 400 / 480; max-width: 100%;
+  border-radius: 14px; overflow: hidden; background: var(--panel);
+  box-shadow: 0 0 0 3px #232c46, 0 18px 40px rgba(0,0,0,.45);
+}
+#game canvas { display: block; }
+.controls { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; max-width: 440px; }
+.stick {
+  position: relative; width: 116px; height: 116px; flex: none; border-radius: 50%;
+  background: radial-gradient(circle, #1d2640 0 55%, #161d31 56%);
+  border: 2px solid var(--edge); touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.knob {
+  position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px;
+  border-radius: 50%; background: #3a4670; border: 2px solid #5b6aa0; pointer-events: none;
+}
+.btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; max-width: 230px; }
+.btns button {
+  font-family: var(--display); font-size: .85rem; color: var(--ink); background: var(--panel);
+  border: 2px solid var(--edge); border-radius: 12px; padding: 14px 4px;
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer;
+}
+.btns .hit { background: #3a1a1d; border-color: var(--glove); color: #ffd9d2; }
+.btns .wide { grid-column: span 2; }
+.btns button.on, .btns button:active { filter: brightness(1.35); transform: scale(.97); }
+.btns button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.hint { font-size: .78rem; color: var(--muted); margin: 0; text-align: center; max-width: 440px; line-height: 1.45; }
+kbd { font-family: var(--body); font-size: .72rem; background: var(--panel); border: 1px solid var(--edge); border-radius: 4px; padding: 1px 5px; color: var(--ink); }
+</style>
+
+<header>
+  <h1>Monkey Punch</h1>
+  <p>Ring mode test</p>
+</header>
+
+<div id="game" aria-label="Boxing ring game"></div>
+
+<div class="controls">
+  <div class="stick" id="stick" aria-label="Move"><div class="knob" id="knob"></div></div>
+  <div class="btns">
+    <button id="b-jab" class="hit" data-b="jab">Jab</button>
+    <button id="b-pow" class="hit" data-b="power">Power</button>
+    <button id="b-blk" class="wide" data-b="block">Block (hold)</button>
+  </div>
+</div>
+<p class="hint">Line up with your rival to land punches. A glowing glove means a power punch is coming: block or step away. Keys: <kbd>WASD</kbd> move, <kbd>J</kbd> jab, <kbd>K</kbd> power, <kbd>L</kbd> block.</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+<script>
+const INK = 0x1b1110, TAN = 0xe9c9a0, RED = 0xff4d3d, WHITE = 0xffffff, GOLD = 0xffd23f;
+const FONT = 'Bungee, Impact, "Arial Black", sans-serif';
+const BOUND_X = 165, BOUND_Z = 98, LANE = 24;
+const ctrl = { sx: 0, sz: 0, jab: false, power: false, block: false };
+
+function shade(c, f) {
+  const r = Math.min(255, ((c >> 16) & 255) * f), g = Math.min(255, ((c >> 8) & 255) * f), b = Math.min(255, (c & 255) * f);
+  return (r << 16) | (g << 8) | b;
+}
+function blob(g, x, y, w, h, fill, lw = 4) {
+  g.fillStyle(fill, 1); g.fillEllipse(x, y, w, h);
+  g.lineStyle(lw, INK, 1); g.strokeEllipse(x, y, w, h);
+}
+function starPts(x, y, r1, r2, n = 5) {
+  const p = [];
+  for (let i = 0; i < n * 2; i++) { const r = i % 2 ? r2 : r1, a = -Math.PI / 2 + i * Math.PI / n; p.push({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r }); }
+  return p;
+}
+function proj(x, z) {
+  const s = 0.82 + (z + 110) / 220 * 0.3;
+  return { sx: 200 + x * s * 1.05, sy: 292 + z, s };
+}
+function makeGlove(scene, trim) {
+  const c = scene.add.container(0, 0);
+  const ring = scene.add.graphics();
+  ring.fillStyle(GOLD, .4); ring.fillCircle(0, 0, 40);
+  ring.lineStyle(6, GOLD, 1); ring.strokeCircle(0, 0, 36); ring.alpha = 0;
+  const g = scene.add.graphics();
+  blob(g, -2, -16, 22, 16, RED);
+  g.fillStyle(RED, 1); g.fillCircle(0, 0, 25); g.lineStyle(4, INK, 1); g.strokeCircle(0, 0, 25);
+  g.fillStyle(trim, 1); g.fillRoundedRect(-29, -12, 12, 26, 4);
+  g.lineStyle(3, INK, 1); g.strokeRoundedRect(-29, -12, 12, 26, 4);
+  g.fillStyle(WHITE, .5); g.fillEllipse(6, -11, 12, 7);
+  c.add([ring, g]); c.ring = ring;
+  return c;
+}
+
+// The monkey from the drawing, turned three-quarters to face right. Flipped to face left.
+function makeFighter(scene, opts) {
+  const { fur, trunks, trim } = opts, dark = shade(fur, .78);
+  const outer = scene.add.container(0, 0);
+  const shadow = scene.add.graphics(); shadow.fillStyle(0x000000, .3); shadow.fillEllipse(0, 0, 130, 26);
+  const rig = scene.add.container(0, -130);
+  outer.add([shadow, rig]);
+
+  const tailG = scene.add.graphics();
+  const c = new Phaser.Curves.CubicBezier(new Phaser.Math.Vector2(-38, 40), new Phaser.Math.Vector2(-104, 52), new Phaser.Math.Vector2(-112, -22), new Phaser.Math.Vector2(-76, -36));
+  tailG.lineStyle(18, INK, 1); c.draw(tailG, 40); tailG.lineStyle(11, fur, 1); c.draw(tailG, 40);
+  tailG.fillStyle(fur, 1); tailG.fillCircle(-76, -36, 5.5);
+
+  const armsBack = scene.add.graphics();
+  const rear = makeGlove(scene, trim);
+  const legB = scene.add.graphics(); blob(legB, -16, 88, 36, 62, dark); blob(legB, -10, 122, 44, 18, shade(TAN, .9));
+  const legF = scene.add.graphics(); blob(legF, 18, 90, 38, 64, fur); blob(legF, 28, 124, 50, 20, TAN);
+
+  const torso = scene.add.graphics();
+  blob(torso, 0, 0, 94, 124, fur);
+  torso.fillStyle(TAN, 1); torso.fillEllipse(13, 10, 50, 82);
+  torso.fillStyle(trunks, 1); torso.fillRoundedRect(-46, 38, 92, 34, 12);
+  torso.lineStyle(4, INK, 1); torso.strokeRoundedRect(-46, 38, 92, 34, 12);
+  torso.fillStyle(WHITE, 1); torso.fillRect(-44, 40, 88, 7);
+
+  const head = scene.add.container(6, -100);
+  const h = scene.add.graphics();
+  h.fillStyle(fur, 1); h.lineStyle(4, INK, 1);
+  h.fillTriangle(-14, -40, -4, -66, 3, -40); h.strokeTriangle(-14, -40, -4, -66, 3, -40);
+  h.fillTriangle(-4, -40, 11, -60, 12, -38); h.strokeTriangle(-4, -40, 11, -60, 12, -38);
+  blob(h, -43, 2, 28, 30, fur); h.fillStyle(TAN, 1); h.fillCircle(-43, 2, 8);
+  blob(h, 0, 0, 92, 92, fur);
+  h.lineStyle(4, INK, 1);
+  h.strokeEllipse(3, -4, 34, 42); h.strokeEllipse(26, -4, 30, 40); h.strokeEllipse(29, 22, 52, 34);
+  h.fillStyle(TAN, 1);
+  h.fillEllipse(3, -4, 34, 42); h.fillEllipse(26, -4, 30, 40); h.fillEllipse(29, 22, 52, 34);
+  [[4, -4, 13, 16, 8], [26, -4, 12, 15, 29]].forEach(([x, y, w, hh, px]) => {
+    h.fillStyle(WHITE, 1); h.fillEllipse(x, y, w, hh); h.lineStyle(3, INK, 1); h.strokeEllipse(x, y, w, hh);
+    h.fillStyle(INK, 1); h.fillCircle(px, -2, 4);
+  });
+  h.lineStyle(6, INK, 1); h.lineBetween(-10, -21, 12, -12); h.lineBetween(37, -22, 19, -12);
+  h.fillStyle(INK, 1); h.fillCircle(42, 14, 2.5); h.fillCircle(50, 15, 2.5);
+  h.lineStyle(4, INK, 1); h.beginPath(); h.arc(36, 37, 9, Math.PI * 1.15, Math.PI * 1.85); h.strokePath();
+  head.add(h);
+
+  const armsFront = scene.add.graphics();
+  const front = makeGlove(scene, trim);
+  const dizzy = scene.add.graphics({ x: 6, y: -168 });
+  for (let i = 0; i < 3; i++) {
+    const a = i * Math.PI * 2 / 3, pts = starPts(Math.cos(a) * 38, Math.sin(a) * 11, 11, 5);
+    dizzy.fillStyle(GOLD, 1); dizzy.fillPoints(pts, true); dizzy.lineStyle(3, INK, 1); dizzy.strokePoints(pts, true);
+  }
+  dizzy.visible = false;
+  rig.add([tailG, armsBack, rear, legB, legF, torso, head, armsFront, front, dizzy]);
+
+  const guard = [{ x: 60, y: -74 }, { x: 52, y: -56 }];
+  const blockPose = [{ x: 52, y: -98 }, { x: 62, y: -80 }];
+  const f = {
+    ...opts, outer, rig, head, legB, legF, dizzy, shadow, armsBack, armsFront,
+    gloves: [rear, front], shoulders: [{ x: -2, y: -44 }, { x: 26, y: -40 }], guard, blockPose,
+    vx: 0, hp: 100, facing: opts.facing, state: 'ready', lockUntil: 0, actId: 0, walk: 0
+  };
+  f.gloves.forEach((g, i) => g.setPosition(guard[i].x, guard[i].y));
+  return f;
+}
+
+function drawArms(f) {
+  [[f.armsBack, 0], [f.armsFront, 1]].forEach(([g, i]) => {
+    g.clear();
+    const s = f.shoulders[i], gl = f.gloves[i], w = 19 * Math.sqrt(gl.scale), col = i ? f.fur : shade(f.fur, .78);
+    g.lineStyle(w + 8, INK, 1); g.lineBetween(s.x, s.y, gl.x, gl.y);
+    g.fillStyle(INK, 1); g.fillCircle(s.x, s.y, (w + 8) / 2);
+    g.lineStyle(w, col, 1); g.lineBetween(s.x, s.y, gl.x, gl.y);
+    g.fillStyle(col, 1); g.fillCircle(s.x, s.y, w / 2);
+  });
+}
+
+class Ring extends Phaser.Scene {
+  constructor() { super('ring'); }
+
+  create() {
+    window.MP = this;
+    this.started = false; this.ko = false; this.koReady = false;
+    this.drawRingBack();
+    this.p = makeFighter(this, { name: 'YOU', fur: 0x7a4a2a, trunks: 0x1f9e6a, trim: 0xbff5dc, x: -95, z: 10, facing: 1, isAI: false });
+    this.e = makeFighter(this, { name: 'RIVAL', fur: 0xa8602c, trunks: 0x6b3fd1, trim: WHITE, x: 95, z: -10, facing: -1, isAI: true });
+    this.e.ai = { mode: 'approach', timer: 0, nextAttack: 0, circle: 1 };
+    this.drawRingFront();
+    this.hud = this.add.graphics().setDepth(5000);
+    this.add.text(14, 10, 'YOU', { fontFamily: FONT, fontSize: '13px', color: '#f3ead8' }).setDepth(5000);
+    this.add.text(386, 10, 'RIVAL', { fontFamily: FONT, fontSize: '13px', color: '#f3ead8' }).setOrigin(1, 0).setDepth(5000);
+    this.drawHud();
+    [this.p, this.e].forEach(f => this.tweens.add({ targets: f.dizzy, angle: 360, duration: 1400, repeat: -1 }));
+
+    this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,Z,X,C');
+    this.input.on('pointerdown', () => { if (this.koReady) this.scene.restart(); });
+
+    const r1 = this.banner('ROUND 1', '46px');
+    this.time.delayedCall(900, () => {
+      r1.destroy();
+      const go = this.banner('FIGHT!', '64px');
+      this.tweens.add({ targets: go, alpha: 0, delay: 500, duration: 300, onComplete: () => go.destroy() });
+      this.started = true; this.e.ai.nextAttack = this.time.now + 900;
+    });
+  }
+
+  drawRingBack() {
+    const g = this.add.graphics().setDepth(0);
+    g.fillGradientStyle(0x070a14, 0x070a14, 0x1a2140, 0x1a2140, 1); g.fillRect(0, 0, 400, 480);
+    const crowd = [0x2a3156, 0x33294d, 0x24344a, 0x3b2f3a, 0x2f3a2c];
+    for (let row = 0; row < 5; row++) for (let i = 0; i < 17; i++) {
+      const x = i * 25 + (row % 2) * 12 + Phaser.Math.Between(-3, 3), y = 52 + row * 24;
+      g.fillStyle(Phaser.Utils.Array.GetRandom(crowd), 1); g.fillCircle(x, y, 8); g.fillEllipse(x, y + 15, 22, 17);
+    }
+    for (let i = 0; i < 16; i++) { g.fillStyle(WHITE, Phaser.Math.FloatBetween(.15, .55)); g.fillCircle(Phaser.Math.Between(8, 392), Phaser.Math.Between(50, 160), 1.8); }
+    const c = [proj(-185, -120), proj(185, -120), proj(185, 120), proj(-185, 120)];
+    g.fillStyle(0x0b0f1c, 1); g.fillPoints([{ x: c[3].sx - 30, y: c[3].sy }, { x: c[2].sx + 30, y: c[2].sy }, { x: 460, y: 480 }, { x: -60, y: 480 }], true);
+    g.fillStyle(0xd7dbe6, 1); g.fillPoints(c.map(p => ({ x: p.sx, y: p.sy })), true);
+    g.fillStyle(WHITE, .1); g.fillEllipse(200, 290, 300, 190);
+    g.lineStyle(3, 0xb3bacb, 1); g.strokeEllipse(200, 300, 200, 70);
+    g.fillStyle(0x1a2140, 1); g.fillPoints([{ x: c[3].sx, y: c[3].sy }, { x: c[2].sx, y: c[2].sy }, { x: c[2].sx, y: c[2].sy + 26 }, { x: c[3].sx, y: c[3].sy + 26 }], true);
+    this.add.text(200, c[3].sy + 13, 'MONKEY PUNCH', { fontFamily: FONT, fontSize: '15px', color: '#ffd23f' }).setOrigin(.5).setDepth(1);
+    this.ropeLines(g, -120, [0xe23b3b, WHITE, 0x3b6fe2], true);
+  }
+
+  ropeLines(g, z, colors, back) {
+    const L = proj(-185, z), R = proj(185, z);
+    colors.forEach((col, i) => {
+      const h = (22 + i * 22) * L.s;
+      g.lineStyle(4, col, back ? 1 : .55); g.lineBetween(L.sx, L.sy - h, R.sx, R.sy - h);
+    });
+    [[L, 0xe23b3b], [R, 0x3b6fe2]].forEach(([p, pad]) => {
+      g.fillStyle(0xc9ccd6, back ? 1 : .7); g.fillRect(p.sx - 5, p.sy - 76 * p.s, 10, 76 * p.s);
+      g.fillStyle(pad, back ? 1 : .7); g.fillRect(p.sx - 6, p.sy - 70 * p.s, 12, 50 * p.s);
+    });
+  }
+
+  drawRingFront() {
+    const g = this.add.graphics().setDepth(4000);
+    const FL = proj(-185, -120), NL = proj(-185, 120), FR = proj(185, -120), NR = proj(185, 120);
+    [0xe23b3b, WHITE, 0x3b6fe2].forEach((col, i) => {
+      g.lineStyle(4, col, .6);
+      g.lineBetween(FL.sx, FL.sy - (22 + i * 22) * FL.s, NL.sx, NL.sy - (22 + i * 22) * NL.s);
+      g.lineBetween(FR.sx, FR.sy - (22 + i * 22) * FR.s, NR.sx, NR.sy - (22 + i * 22) * NR.s);
+    });
+    this.ropeLines(g, 120, [0xe23b3b, WHITE, 0x3b6fe2], false);
+  }
+
+  drawHud() {
+    const g = this.hud; g.clear();
+    const bar = (x, pct, flip) => {
+      g.fillStyle(0x000000, .6); g.fillRoundedRect(x, 28, 160, 13, 5);
+      const c = pct > .5 ? 0x3ddc84 : pct > .25 ? GOLD : 0xff4d3d, w = 156 * Math.max(0, pct);
+      g.fillStyle(c, 1); g.fillRoundedRect(flip ? x + 2 + 156 - w : x + 2, 30, Math.max(w, .01), 9, 4);
+    };
+    bar(14, this.p.hp / 100, false); bar(226, this.e.hp / 100, true);
+  }
+
+  banner(str, size) {
+    const t = this.add.text(200, 230, str, { fontFamily: FONT, fontSize: size, color: '#ffd23f', stroke: '#1b1110', strokeThickness: 9 }).setOrigin(.5).setDepth(6000).setScale(.3);
+    this.tweens.add({ targets: t, scale: 1, duration: 300, ease: 'Back.easeOut' });
+    return t;
+  }
+  popup(x, y, str, size = '26px', color = '#ffd23f') {
+    const t = this.add.text(x, y, str, { fontFamily: FONT, fontSize: size, color, stroke: '#1b1110', strokeThickness: 6 }).setOrigin(.5).setDepth(6000);
+    this.tweens.add({ targets: t, y: y - 40, alpha: 0, delay: 300, duration: 500, onComplete: () => t.destroy() });
+  }
+  spark(x, y, big) {
+    const g = this.add.graphics({ x, y }).setDepth(5500), pts = starPts(0, 0, big ? 34 : 24, big ? 14 : 10, 8);
+    g.fillStyle(GOLD, 1); g.fillPoints(pts, true); g.lineStyle(4, INK, 1); g.strokePoints(pts, true);
+    g.fillStyle(WHITE, 1); g.fillCircle(0, 0, big ? 9 : 6); g.setScale(.4);
+    this.tweens.add({ targets: g, scale: 1.2, alpha: 0, angle: 25, duration: 240, onComplete: () => g.destroy() });
+  }
+  gloveScreen(f, i) {
+    const gl = f.gloves[i], o = f.outer;
+    return { x: o.x + f.facing * gl.x * o.scale, y: o.y + (f.rig.y + gl.y) * o.scale };
+  }
+
+  other(f) { return f === this.p ? this.e : this.p; }
+  inRange(a, b, reach = 105) {
+    const dx = (b.x - a.x) * a.facing;
+    return dx > 28 && dx < reach && Math.abs(b.z - a.z) < LANE;
+  }
+
+  toGuard(f, pose = f.guard, ms = 120) {
+    f.gloves.forEach((g, i) => { this.tweens.killTweensOf(g); this.tweens.add({ targets: g, x: pose[i].x, y: pose[i].y, scale: 1, duration: ms }); });
+  }
+
+  // ---------- actions ----------
+  jab(f) {
+    if (f.state !== 'ready') return;
+    f.state = 'jab'; const id = ++f.actId, gl = f.gloves[1];
+    if (!f.isAI) this.aiReact();
+    this.tweens.killTweensOf(gl);
+    this.tweens.add({
+      targets: gl, x: 114, y: -62, scale: 1.05, duration: 85, ease: 'Quad.easeIn',
+      onComplete: () => {
+        if (id !== f.actId) return;
+        this.resolveHit(f, 6, 'jab', 1);
+        this.tweens.add({ targets: gl, x: f.guard[1].x, y: f.guard[1].y, scale: 1, duration: 120, onComplete: () => { if (id === f.actId) f.state = 'ready'; } });
+      }
+    });
+  }
+
+  power(f) {
+    if (f.state !== 'ready') return;
+    f.state = 'power'; const id = ++f.actId, gl = f.gloves[0];
+    this.tweens.killTweensOf(gl);
+    this.tweens.add({ targets: gl, x: 22, y: -62, scale: .95, duration: 200, ease: 'Quad.easeOut' });
+    gl.ring.alpha = 0;
+    this.tweens.add({ targets: gl.ring, alpha: 1, duration: 100, yoyo: true, repeat: -1 });
+    if (!f.isAI) this.aiReact();
+    this.time.delayedCall(f.isAI ? 420 : 240, () => {
+      if (id !== f.actId) return;
+      this.tweens.killTweensOf(gl.ring); gl.ring.alpha = 0;
+      this.tweens.add({ targets: f.head, x: 14, duration: 110, yoyo: true });
+      this.tweens.add({
+        targets: gl, x: 122, y: -82, scale: 1.15, duration: 110, ease: 'Quad.easeIn',
+        onComplete: () => {
+          if (id !== f.actId) return;
+          this.resolveHit(f, 14, 'power', 0);
+          this.tweens.add({ targets: gl, x: f.guard[0].x, y: f.guard[0].y, scale: 1, duration: 200, onComplete: () => { if (id === f.actId) f.state = 'ready'; } });
+        }
+      });
+    });
+  }
+
+  setBlock(f, on) {
+    if (on && f.state === 'ready') { f.state = 'block'; this.toGuard(f, f.blockPose, 80); }
+    else if (!on && f.state === 'block') { f.state = 'ready'; this.toGuard(f); }
+  }
+
+  stun(f, ms) {
+    f.actId++;
+    f.gloves.forEach(g => { this.tweens.killTweensOf(g.ring); g.ring.alpha = 0; });
+    f.state = 'stun'; f.lockUntil = this.time.now + ms;
+    this.toGuard(f);
+  }
+
+  resolveHit(a, dmg, kind, gi) {
+    const b = this.other(a);
+    if (b.state === 'ko' || this.ko) return;
+    if (!this.inRange(a, b, kind === 'power' ? 118 : 108)) return;
+    const pt = this.gloveScreen(a, gi);
+    if (b.state === 'block' && b.facing === -a.facing) {
+      b.vx = a.facing * 70;
+      this.popup(pt.x, pt.y - 20, 'BLOCK', '16px', '#cfd6ea');
+      return;
+    }
+    b.hp = Math.max(0, b.hp - dmg); this.drawHud();
+    b.vx = a.facing * (kind === 'power' ? 340 : 130);
+    this.spark(pt.x, pt.y, kind === 'power');
+    this.tweens.add({ targets: b.head, x: -6, angle: -16, duration: 70, yoyo: true });
+    this.tweens.add({ targets: b.rig, alpha: .45, duration: 50, yoyo: true });
+    if (kind === 'power') { this.cameras.main.shake(160, .01); this.popup(pt.x, pt.y - 30, 'POW!'); }
+    if (!b.isAI) this.cameras.main.flash(90, 255, 70, 60);
+    this.stun(b, kind === 'power' ? 560 : 240);
+    if (kind === 'power') { b.dizzy.visible = true; this.time.delayedCall(560, () => { if (b.state !== 'ko') b.dizzy.visible = false; }); }
+    if (b.hp <= 0) this.knockout(b, a);
+  }
+
+  knockout(loser, winner) {
+    this.ko = true; loser.state = 'ko'; loser.actId++; loser.dizzy.visible = true;
+    this.tweens.add({ targets: loser.rig, angle: -82, y: -44, duration: 650, ease: 'Bounce.easeOut' });
+    winner.state = 'ko'; winner.actId++;
+    this.time.delayedCall(250, () => {
+      winner.gloves.forEach((g, i) => { this.tweens.killTweensOf(g); this.tweens.add({ targets: g, x: 20 + i * 24, y: -170, duration: 240, yoyo: true, hold: 120, repeat: 4 }); });
+    });
+    this.banner('K.O.!', '76px');
+    const msg = winner.isAI ? 'The rival wins. Tap to try again' : 'You win! Tap to fight again';
+    const s = this.add.text(200, 296, msg, { fontFamily: FONT, fontSize: '15px', color: '#f3ead8', stroke: '#1b1110', strokeThickness: 5 }).setOrigin(.5).setDepth(6000).setAlpha(0);
+    this.time.delayedCall(900, () => { s.setAlpha(1); this.koReady = true; });
+  }
+
+  // ---------- AI ----------
+  aiReact() {
+    const e = this.e;
+    if (e.state === 'ready' && this.inRange(this.p, e, 125) && Math.random() < .32) {
+      this.setBlock(e, true); e.lockUntil = this.time.now + 480;
+    }
+  }
+
+  aiThink(dt, now) {
+    const e = this.e, p = this.p, ai = e.ai;
+    ai.timer -= dt;
+    if (ai.timer <= 0) {
+      const r = Math.random(), low = e.hp < 35;
+      ai.mode = r < (low ? .35 : .55) ? 'approach' : r < (low ? .65 : .82) ? 'circle' : 'retreat';
+      ai.circle = Math.random() < .5 ? -1 : 1;
+      ai.timer = Phaser.Math.FloatBetween(.5, 1.3);
+    }
+    if (e.state === 'block' && now > e.lockUntil) this.setBlock(e, false);
+    const side = Math.sign(p.x - e.x) || 1;
+    let tx = p.x - side * 82, tz = p.z;
+    if (ai.mode === 'circle') tz = Phaser.Math.Clamp(p.z + ai.circle * 55, -BOUND_Z, BOUND_Z);
+    if (ai.mode === 'retreat') { tx = p.x - side * 175; tz = e.z; }
+    let mx = tx - e.x, mz = tz - e.z; const d = Math.hypot(mx, mz);
+    if (d < 6) { mx = 0; mz = 0; } else { mx /= d; mz /= d; }
+
+    if (e.state === 'ready' && now > ai.nextAttack && this.inRange(e, p, 110)) {
+      Math.random() < .62 ? this.jab(e) : this.power(e);
+      ai.nextAttack = now + Phaser.Math.Between(550, 1150) * (.65 + .35 * e.hp / 100);
+    }
+    return { mx, mz };
+  }
+
+  // ---------- loop ----------
+  update(time, delta) {
+    const dt = Math.min(delta / 1000, .05), k = this.keys;
+    for (const f of [this.p, this.e]) if (f.state === 'stun' && time > f.lockUntil) f.state = 'ready';
+
+    let pm = { mx: 0, mz: 0 };
+    if (this.started && !this.ko) {
+      const kx = (k.D.isDown || k.RIGHT.isDown) - (k.A.isDown || k.LEFT.isDown);
+      const kz = (k.S.isDown || k.DOWN.isDown) - (k.W.isDown || k.UP.isDown);
+      pm.mx = Phaser.Math.Clamp(ctrl.sx + kx, -1, 1); pm.mz = Phaser.Math.Clamp(ctrl.sz + kz, -1, 1);
+      if (Phaser.Input.Keyboard.JustDown(k.J) || Phaser.Input.Keyboard.JustDown(k.Z) || ctrl.jab) this.jab(this.p);
+      if (Phaser.Input.Keyboard.JustDown(k.K) || Phaser.Input.Keyboard.JustDown(k.X) || ctrl.power) this.power(this.p);
+      this.setBlock(this.p, ctrl.block || k.L.isDown || k.C.isDown);
+    }
+    ctrl.jab = ctrl.power = false;
+    const em = this.started && !this.ko ? this.aiThink(dt, time) : { mx: 0, mz: 0 };
+
+    [[this.p, pm, 150], [this.e, em, 118]].forEach(([f, m, speed]) => {
+      let sp = speed;
+      if (f.state === 'stun' || f.state === 'ko' || f.state === 'power') sp = 0;
+      else if (f.state === 'block') sp *= .4;
+      else if (f.state === 'jab') sp *= .5;
+      f.x += m.mx * sp * dt + f.vx * dt;
+      f.z += m.mz * sp * .8 * dt;
+      f.vx *= Math.pow(.86, dt * 60);
+      if (Math.abs(f.x) > BOUND_X) {
+        f.x = Math.sign(f.x) * BOUND_X;
+        if (Math.abs(f.vx) > 90) { f.vx = -f.vx * .45; this.cameras.main.shake(90, .004); }
+      }
+      f.z = Phaser.Math.Clamp(f.z, -BOUND_Z, BOUND_Z);
+      const moving = sp > 0 && (Math.abs(m.mx) + Math.abs(m.mz)) > .1;
+      f.walk = moving ? f.walk + dt * 14 : f.walk * .8;
+      f.legF.y = Math.sin(f.walk) * (moving ? 6 : 0);
+      f.legB.y = -Math.sin(f.walk) * (moving ? 6 : 0);
+    });
+
+    const a = this.p, b = this.e, dx = b.x - a.x;
+    if (Math.abs(b.z - a.z) < LANE + 4 && Math.abs(dx) < 48) {
+      const push = (48 - Math.abs(dx)) / 2, s = Math.sign(dx) || 1;
+      a.x -= s * push; b.x += s * push;
+    }
+    for (const f of [a, b]) {
+      if (f.state === 'ready' || f.state === 'block') f.facing = Math.sign(this.other(f).x - f.x) || f.facing;
+      const pr = proj(f.x, f.z);
+      f.outer.setPosition(pr.sx, pr.sy).setScale(.6 * pr.s).setDepth(10 + pr.sy);
+      f.rig.scaleX = f.facing;
+      if (f.state !== 'ko') f.rig.y = -130 + Math.sin(time / 230 + (f.isAI ? 1.7 : 0)) * 2.5;
+      drawArms(f);
+    }
+  }
+}
+
+function boot() {
+  new Phaser.Game({
+    type: Phaser.AUTO, parent: 'game', width: 400, height: 480, backgroundColor: '#0d1220',
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scene: Ring
+  });
+}
+const fontReady = document.fonts && document.fonts.load ? document.fonts.load('32px Bungee') : Promise.resolve();
+Promise.race([fontReady, new Promise(r => setTimeout(r, 1500))]).then(boot, boot);
+
+// Thumb stick
+const stick = document.getElementById('stick'), knob = document.getElementById('knob');
+let stickId = null;
+function moveStick(e) {
+  const r = stick.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  let dx = e.clientX - cx, dy = e.clientY - cy; const max = r.width / 2 - 14, d = Math.hypot(dx, dy);
+  if (d > max) { dx = dx / d * max; dy = dy / d * max; }
+  knob.style.transform = `translate(${dx}px, ${dy}px)`;
+  ctrl.sx = Math.abs(dx / max) < .18 ? 0 : dx / max;
+  ctrl.sz = Math.abs(dy / max) < .18 ? 0 : dy / max;
+}
+function endStick() { stickId = null; ctrl.sx = ctrl.sz = 0; knob.style.transform = ''; }
+stick.addEventListener('pointerdown', e => { e.preventDefault(); stickId = e.pointerId; try { stick.setPointerCapture(e.pointerId); } catch (_) {} moveStick(e); });
+stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) moveStick(e); });
+stick.addEventListener('pointerup', e => { if (e.pointerId === stickId) endStick(); });
+stick.addEventListener('pointercancel', e => { if (e.pointerId === stickId) endStick(); });
+
+// Buttons
+document.querySelectorAll('.btns button').forEach(btn => {
+  const b = btn.dataset.b;
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault(); btn.classList.add('on');
+    if (window.MP && window.MP.koReady) { window.MP.scene.restart(); return; }
+    if (b === 'block') ctrl.block = true; else ctrl[b] = true;
+  });
+  const up = () => { btn.classList.remove('on'); if (b === 'block') ctrl.block = false; };
+  btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up); btn.addEventListener('pointerleave', up);
+});
+</script>
