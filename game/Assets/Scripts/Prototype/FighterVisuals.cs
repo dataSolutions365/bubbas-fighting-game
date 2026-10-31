@@ -12,6 +12,8 @@ namespace Bubba.Prototype
     {
         public Renderer body;
         public Color baseColor = Color.gray;
+        [Tooltip("Optional. When set, the hand-drawn monkey is animated instead of the capsule.")]
+        public MonkeySpriteRig spriteRig;
 
         private static readonly Color LightArm = new Color(0.95f, 0.85f, 0.7f);
         private static readonly Color HeavyArm = new Color(1f, 0.55f, 0.1f);
@@ -48,6 +50,8 @@ namespace Bubba.Prototype
                 bodyScale = bodyT.localScale;
             }
 
+            if (spriteRig != null) return;
+
             arm = MakePart("Attack arm", PrimitiveType.Cube, LightArm).transform;
             armRenderer = arm.GetComponent<Renderer>();
             arm.gameObject.SetActive(false);
@@ -71,6 +75,11 @@ namespace Bubba.Prototype
         private void Update()
         {
             var state = fighter.CurrentState;
+            if (spriteRig != null)
+            {
+                spriteRig.Pose(state, attackStartedAt, Time.time < flashUntil ? flashColor : (Color?)null);
+                return;
+            }
             UpdateArm(state);
             shield.gameObject.SetActive(state == FighterController.State.Blocking);
             UpdateBody(state);
@@ -183,6 +192,7 @@ namespace Bubba.Prototype
             else
             {
                 Flash(HitFlash);
+                if (spriteRig != null) spriteRig.OnHit();
                 CombatText.Add(Head(), $"-{Mathf.RoundToInt(damage)}", HitFlash, damage >= 60f ? 1.4f : 1.1f);
             }
         }

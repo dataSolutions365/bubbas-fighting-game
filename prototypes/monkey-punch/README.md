@@ -8,7 +8,7 @@
 
 All games load Phaser 3.80.1 from cdnjs, so they need an internet connection.
 
-## art/ (now in `game/Assets/Art/Monkey/` so Unity can use it)
+## art/ (now in `game/Assets/Resources/Monkey/` so Unity can use it)
 - monkey-guard-colored.png, monkey-punch-colored.png: the two drawings, cleaned up, colored, scribble shadows swapped for soft shadows, transparent background.
 - body-parts/: the guard drawing cut into separate pieces for animation (full-size 660x971, all pieces line up when stacked).
   - Arm pivots (shoulder): right arm 446,300; left arm 288,300. Neck pivot for head: 362,250.

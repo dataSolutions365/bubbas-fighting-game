@@ -16,14 +16,17 @@ namespace Bubba.Prototype
         public FighterStats[] roster;
         [Tooltip("Optional. Leave empty to use the built-in ability set.")]
         public AbilityLibrary abilityLibrary;
+        [Tooltip("Draw the fighters as the hand-drawn monkey (Resources/Monkey) instead of capsules.")]
+        public bool useMonkeyArt = true;
 
         private void Awake()
         {
             if (GameSession.Instance == null) new GameObject("GameSession").AddComponent<GameSession>();
 
             BuildStage();
-            var player = BuildFighter("Player", new Color(0.45f, 0.3f, 0.18f), -2.5f);
-            var enemy = BuildFighter("Enemy", new Color(0.3f, 0.36f, 0.55f), 2.5f);
+            var player = BuildFighter("Player", new Color(0.45f, 0.3f, 0.18f), -2.5f, useMonkeyArt, Color.white);
+            // The CPU monkey gets a cool tint so the two are easy to tell apart.
+            var enemy = BuildFighter("Enemy", new Color(0.3f, 0.36f, 0.55f), 2.5f, useMonkeyArt, new Color(0.7f, 0.82f, 1f));
             player.opponent = enemy;
             enemy.opponent = player;
             player.SetInput(player.gameObject.AddComponent<PlayerInputRouter>());
@@ -70,7 +73,7 @@ namespace Bubba.Prototype
             ground.GetComponent<Renderer>().material.color = new Color(0.42f, 0.5f, 0.32f);
         }
 
-        private static FighterController BuildFighter(string name, Color color, float x)
+        private static FighterController BuildFighter(string name, Color color, float x, bool monkey, Color monkeyTint)
         {
             var root = new GameObject(name);
             root.transform.position = new Vector3(x, 0f, 0f);
@@ -98,6 +101,14 @@ namespace Bubba.Prototype
             var visuals = root.AddComponent<FighterVisuals>();
             visuals.body = body.GetComponent<Renderer>();
             visuals.baseColor = color;
+
+            var rig = monkey ? MonkeySpriteRig.TryCreate(fighter, monkeyTint) : null;
+            if (rig != null)
+            {
+                body.SetActive(false);
+                visuals.body = null;
+                visuals.spriteRig = rig;
+            }
 
             return fighter;
         }
