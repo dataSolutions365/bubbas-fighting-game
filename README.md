@@ -13,6 +13,8 @@ prototype scope: [Animal Fighting Game: Plan](https://claude.ai/artifact/XfrVDDy
 | --- | --- |
 | `game/` | The Unity project. Game code is in `game/Assets/Scripts`. |
 | `firebase/` | Firestore security rules, Cloud Functions (points, shop, matches) and the starter catalog of fighters and abilities. |
+| `game/Assets/Art/Monkey/` | The hand-drawn boxing monkey, colored, plus the same drawing cut into body parts for animation. |
+| `prototypes/monkey-punch/` | Quick browser game tests (Phaser) using the monkey. Open any `.html` file in `games/` in a web browser. |
 | `ci/` | A compile check that lets GitHub build the C# scripts without Unity. |
 
 ### How points stay cheat-proof
@@ -48,7 +50,7 @@ In the Unity editor you can also use the keyboard: **A/D** move, **J** light, **
 ## 1. Open the game in Unity
 
 1. Install [Unity Hub](https://unity.com/download), then install **Unity 6 LTS** with **Android Build Support** (add **iOS Build Support** if you're on a Mac).
-2. Clone this repo with GitHub Desktop or `git clone`, then run `git lfs install` once. Git LFS stores big files such as models and sounds.
+2. Download this repo: clone it with GitHub Desktop or `git clone`, or use **Code > Download ZIP** on GitHub and extract it.
 3. In Unity Hub, choose **Add > Add project from disk** and pick the `game` folder. Choose Unity 6 if asked. On first open, Unity creates the rest of the project files (`ProjectSettings/`, `Packages/`), which you should commit.
 4. Create an empty scene (**File > New Scene > Basic**), add an empty GameObject, click **Add Component** and choose **Prototype Bootstrap**. Save the scene as `Assets/Scenes/Prototype.unity`.
 5. Press **Play**. You'll get a menu, a shop and a best-of-3 fight between two capsules that stand in for the bear and gorilla.
