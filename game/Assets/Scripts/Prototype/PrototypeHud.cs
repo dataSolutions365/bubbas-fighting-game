@@ -19,6 +19,10 @@ namespace Bubba.Prototype
         private Vector2 shopScroll;
         private float u; // one "unit" = 1/720 of the screen height
         private GUIStyle label, small, big, button, panel;
+        private GUIStyle cardName, lockTag, barName, badgeText, timeLabel, comboLabel;
+        private string focusedId;
+        private ComboTracker playerCombo, enemyCombo;
+        private int comboRound = -1;
 
         private static readonly string[] SchemeNames = { "Easy (tap)", "Medium (pad)" };
         private static readonly string[] AiNames = { "Easy", "Medium", "Hard" };
@@ -26,6 +30,19 @@ namespace Bubba.Prototype
         private void Start()
         {
             scheme = (ControlScheme)Mathf.Clamp(PlayerPrefs.GetInt(PlayerInputRouter.SchemePrefKey, 0), 0, 1);
+            playerCombo = new ComboTracker(rounds.player, rounds.enemy);
+            enemyCombo = new ComboTracker(rounds.enemy, rounds.player);
+        }
+
+        private void Update()
+        {
+            // Each round starts with empty combo meters.
+            if (playerCombo != null && rounds.RoundNumber != comboRound)
+            {
+                comboRound = rounds.RoundNumber;
+                playerCombo.Reset();
+                enemyCombo.Reset();
+            }
         }
 
         private void OnGUI()
@@ -56,48 +73,105 @@ namespace Bubba.Prototype
 
         private void DrawMenu(GameSession session)
         {
-            GUILayout.BeginArea(Center(620, 640), panel);
-            GUILayout.Label("Bubba's Fighting Game", big);
+            GUILayout.BeginArea(Center(1180, 690), panel);
+            GUILayout.Label("CHOOSE YOUR FIGHTER", big);
             GUILayout.Label(session.Status, small);
 
             if (session.Ready)
             {
                 var profile = session.Profile;
+                if (focusedId == null) focusedId = profile.selectedFighter;
                 GUILayout.Label($"Points: {profile.fightPoints}", label);
 
-                GUILayout.Label("Your fighter", small);
-                GUILayout.BeginHorizontal();
-                foreach (var stats in rounds.roster)
-                {
-                    bool selected = profile.selectedFighter == stats.fighterId;
-                    GUI.enabled = !session.Busy && !selected;
-                    if (GUILayout.Button(selected ? $"> {stats.displayName} <" : stats.displayName, button))
-                    {
-                        _ = session.SelectFighter(stats.fighterId);
-                    }
-                }
-                GUI.enabled = true;
-                GUILayout.EndHorizontal();
+                Rect grid = GUILayoutUtility.GetRect(100, 320 * u, GUILayout.ExpandWidth(true));
+                DrawSelectGrid(session, grid);
 
+                var focus = RosterCatalog.Find(focusedId);
+                if (focus != null)
+                {
+                    bool playable = IsPlayable(focus.id);
+                    GUILayout.Label($"{focus.name}, {focus.animal}.  Special idea: {focus.abilityIdea}" +
+                        (playable ? "" : "\nNeeds a full-body drawing before this fighter can play."), small);
+                }
+
+                GUILayout.BeginHorizontal();
+                GUILayout.BeginVertical();
                 GUILayout.Label("Controls", small);
                 scheme = (ControlScheme)GUILayout.Toolbar((int)scheme, SchemeNames, button);
+                GUILayout.EndVertical();
+                GUILayout.Space(16 * u);
+                GUILayout.BeginVertical();
                 GUILayout.Label("Opponent", small);
                 aiDifficulty = (AiDifficulty)GUILayout.Toolbar((int)aiDifficulty, AiNames, button);
+                GUILayout.EndVertical();
+                GUILayout.EndHorizontal();
 
-                GUILayout.Space(12 * u);
+                GUILayout.Space(10 * u);
+                GUILayout.BeginHorizontal();
                 GUI.enabled = !session.Busy;
-                if (GUILayout.Button("FIGHT", button, GUILayout.Height(70 * u)))
+                if (GUILayout.Button("FIGHT", button, GUILayout.Height(64 * u)))
                 {
                     rounds.BeginMatch(scheme, aiDifficulty);
                 }
-                if (GUILayout.Button("Ability shop", button))
+                if (GUILayout.Button("Ability shop", button, GUILayout.Height(64 * u), GUILayout.Width(260 * u)))
                 {
                     showShop = true;
                 }
                 GUI.enabled = true;
+                GUILayout.EndHorizontal();
             }
             GUILayout.EndArea();
         }
+
+        /// The 6 x 2 grid of portraits from the drawing. Fighters with art can be
+        /// picked; the rest show their notes and a "needs drawing" tag.
+        private void DrawSelectGrid(GameSession session, Rect area)
+        {
+            const int cols = 6;
+            var all = RosterCatalog.All;
+            int rows = Mathf.CeilToInt(all.Count / (float)cols);
+            float gap = 8 * u;
+            float cw = (area.width - gap * (cols - 1)) / cols;
+            float ch = (area.height - gap * (rows - 1)) / rows;
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                var e = all[i];
+                var r = new Rect(area.x + (i % cols) * (cw + gap), area.y + (i / cols) * (ch + gap), cw, ch);
+                bool playable = IsPlayable(e.id);
+                bool selected = session.Profile.selectedFighter == e.id;
+                bool focused = focusedId == e.id;
+
+                // Card: paper-coloured, with a gold frame on the picked fighter.
+                Fill(r, selected ? new Color(1f, 0.8f, 0.2f) : focused ? new Color(0.8f, 0.8f, 0.85f) : new Color(0.25f, 0.25f, 0.28f));
+                var inner = new Rect(r.x + 3 * u, r.y + 3 * u, r.width - 6 * u, r.height - 6 * u);
+                Fill(inner, new Color(0.96f, 0.93f, 0.86f));
+
+                var tex = RosterCatalog.Portrait(e.id);
+                var pic = new Rect(inner.x + 4 * u, inner.y + 4 * u, inner.width - 8 * u, inner.height - 34 * u);
+                if (tex != null)
+                {
+                    GUI.color = playable ? Color.white : new Color(1f, 1f, 1f, 0.6f);
+                    GUI.DrawTexture(pic, tex, ScaleMode.ScaleToFit);
+                    GUI.color = Color.white;
+                }
+                GUI.Label(new Rect(inner.x, inner.yMax - 30 * u, inner.width, 28 * u), e.name, cardName);
+                if (!playable)
+                {
+                    var tag = new Rect(inner.x, inner.y, inner.width, 24 * u);
+                    Fill(tag, new Color(1f, 1f, 1f, 0.75f));
+                    GUI.Label(tag, "needs drawing", lockTag);
+                }
+
+                if (GUI.Button(r, GUIContent.none, GUIStyle.none))
+                {
+                    focusedId = e.id;
+                    if (playable && !selected && !session.Busy) _ = session.SelectFighter(e.id);
+                }
+            }
+        }
+
+        private bool IsPlayable(string id) => rounds.roster.Exists(s => s != null && s.fighterId == id);
 
         private void DrawShop(GameSession session)
         {
@@ -149,10 +223,8 @@ namespace Bubba.Prototype
 
         private void DrawFight()
         {
-            DrawHealth(rounds.player, new Rect(20 * u, 20 * u, Screen.width * 0.38f, 28 * u), false);
-            DrawHealth(rounds.enemy, new Rect(Screen.width - Screen.width * 0.38f - 20 * u, 20 * u, Screen.width * 0.38f, 28 * u), true);
-            GUI.Label(new Rect(Screen.width / 2f - 60 * u, 12 * u, 120 * u, 44 * u), Mathf.CeilToInt(Mathf.Max(0, rounds.TimeLeft)).ToString(), big);
-            GUI.Label(new Rect(Screen.width / 2f - 100 * u, 52 * u, 200 * u, 30 * u), $"{rounds.PlayerRounds} - {rounds.EnemyRounds}", label);
+            DrawTopBar();
+            DrawComboMeters();
             if (!string.IsNullOrEmpty(rounds.Banner)) GUI.Label(Center(800, 120), rounds.Banner, big);
 
             if (rounds.CurrentPhase != RoundManager.Phase.Fighting) return;
@@ -175,7 +247,7 @@ namespace Bubba.Prototype
                 }
                 else
                 {
-                    GUI.Label(new Rect(20 * u, Screen.height - 50 * u, Screen.width * 0.4f, 40 * u),
+                    GUI.Label(new Rect(20 * u, Screen.height - 130 * u, Screen.width * 0.4f, 40 * u),
                         "Touch here and drag to move", small);
                 }
             }
@@ -243,7 +315,7 @@ namespace Bubba.Prototype
             var style = new GUIStyle(small) { alignment = TextAnchor.UpperLeft };
             float w = Screen.width * 0.42f;
             float h = style.CalcHeight(new GUIContent(text), w - 20 * u) + 20 * u;
-            var r = new Rect(20 * u, 110 * u, w, h);
+            var r = new Rect(20 * u, 120 * u, w, h);
             GUI.color = new Color(0f, 0f, 0f, 0.55f);
             GUI.DrawTexture(r, Texture2D.whiteTexture);
             GUI.color = Color.white;
@@ -264,16 +336,146 @@ namespace Bubba.Prototype
 
         // ---------- helpers ----------
 
+        /// The fight bar from the sketch: P1 / P2 badges at the ends, long health
+        /// bars, and TIME in the middle between two lightning bolts.
+        private void DrawTopBar()
+        {
+            float top = 14 * u, barH = 30 * u, badge = 54 * u, timeW = 150 * u, bolt = 34 * u;
+            float side = 14 * u;
+            float barW = (Screen.width - timeW - 2 * bolt - 2 * badge - 2 * side - 8 * u) / 2f;
+            float cx = Screen.width / 2f;
+
+            var p1Badge = new Rect(side, top - 12 * u, badge, badge);
+            var p2Badge = new Rect(Screen.width - side - badge, top - 12 * u, badge, badge);
+            var p1Bar = new Rect(p1Badge.xMax + 2 * u, top, barW, barH);
+            var p2Bar = new Rect(p2Badge.x - 2 * u - barW, top, barW, barH);
+
+            DrawHealth(rounds.player, p1Bar, false);
+            DrawHealth(rounds.enemy, p2Bar, true);
+            DrawBadge(p1Badge, "P1", new Color(0.85f, 0.2f, 0.15f));
+            DrawBadge(p2Badge, "P2", new Color(0.2f, 0.4f, 0.85f));
+
+            // Names and rounds won under the bars, like "P1  JACKE  ●".
+            GUI.Label(new Rect(p1Bar.x, p1Bar.yMax + 2 * u, barW, 28 * u), NameOf(rounds.player), barName);
+            var right = new GUIStyle(barName) { alignment = TextAnchor.UpperRight };
+            GUI.Label(new Rect(p2Bar.x, p2Bar.yMax + 2 * u, barW, 28 * u), NameOf(rounds.enemy), right);
+            DrawRoundPips(new Vector2(p1Bar.xMax, p1Bar.yMax + 8 * u), rounds.PlayerRounds, -1);
+            DrawRoundPips(new Vector2(p2Bar.x, p2Bar.yMax + 8 * u), rounds.EnemyRounds, 1);
+
+            // TIME box with a bolt on each side.
+            var timeBox = new Rect(cx - timeW / 2f, top - 8 * u, timeW, 72 * u);
+            Fill(timeBox, new Color(0f, 0f, 0f, 0.65f));
+            GUI.Label(new Rect(timeBox.x, timeBox.y + 2 * u, timeW, 22 * u), "TIME", timeLabel);
+            int secs = Mathf.CeilToInt(Mathf.Max(0f, rounds.TimeLeft));
+            GUI.Label(new Rect(timeBox.x, timeBox.y + 20 * u, timeW, 50 * u), $"{secs / 60}:{secs % 60:00}", big);
+            var boltTex = BoltTexture();
+            GUI.DrawTexture(new Rect(timeBox.x - bolt - 2 * u, top - 6 * u, bolt, bolt * 2f), boltTex, ScaleMode.ScaleToFit);
+            GUI.DrawTextureWithTexCoords(new Rect(timeBox.xMax + 2 * u, top - 6 * u, bolt, bolt * 2f), boltTex, new Rect(1, 0, -1, 1));
+        }
+
+        private void DrawBadge(Rect r, string text, Color color)
+        {
+            Fill(r, Color.black);
+            Fill(new Rect(r.x + 3 * u, r.y + 3 * u, r.width - 6 * u, r.height - 6 * u), color);
+            GUI.Label(r, text, badgeText);
+        }
+
+        private void DrawRoundPips(Vector2 anchor, int won, int direction)
+        {
+            float s = 14 * u, gap = 6 * u;
+            for (int i = 0; i < rounds.roundsToWin; i++)
+            {
+                float x = direction < 0 ? anchor.x - (i + 1) * (s + gap) : anchor.x + gap + i * (s + gap);
+                var r = new Rect(x, anchor.y, s, s);
+                Fill(r, Color.black);
+                Fill(new Rect(r.x + 2 * u, r.y + 2 * u, s - 4 * u, s - 4 * u),
+                    i < won ? new Color(1f, 0.85f, 0.2f) : new Color(0.3f, 0.3f, 0.3f));
+            }
+        }
+
+        /// COMBO meters in the bottom corners, kept clear of the touch buttons.
+        private void DrawComboMeters()
+        {
+            if (playerCombo == null) return;
+            float w = 250 * u, h = 22 * u, y = Screen.height - 70 * u;
+            var clusterLeft = TouchLayout.ToGui(TouchLayout.Light).x; // the button cluster's left edge
+            float rightX = Mathf.Min(Screen.width - w - 20 * u, clusterLeft - w - 20 * u);
+            DrawCombo(new Rect(20 * u, y, w, h), playerCombo, false);
+            DrawCombo(new Rect(rightX, y, w, h), enemyCombo, true);
+        }
+
+        private void DrawCombo(Rect r, ComboTracker combo, bool rightToLeft)
+        {
+            int live = combo.Live;
+            var head = new Rect(r.x, r.y - 30 * u, r.width, 28 * u);
+            var style = new GUIStyle(comboLabel) { alignment = rightToLeft ? TextAnchor.LowerRight : TextAnchor.LowerLeft };
+            GUI.Label(head, live >= 2 ? $"COMBO  x{live}" : "COMBO", style);
+            Fill(r, Color.black);
+            var inner = new Rect(r.x + 2 * u, r.y + 2 * u, r.width - 4 * u, r.height - 4 * u);
+            Fill(inner, new Color(0.2f, 0.2f, 0.22f));
+            float w = inner.width * combo.Fill;
+            Fill(new Rect(rightToLeft ? inner.xMax - w : inner.x, inner.y, w, inner.height),
+                Color.Lerp(new Color(0.3f, 0.7f, 1f), new Color(1f, 0.4f, 0.9f), combo.Fill));
+        }
+
+        private string NameOf(FighterController f) =>
+            (f.stats != null ? f.stats.displayName : f.name).ToUpperInvariant();
+
         private void DrawHealth(FighterController f, Rect r, bool rightToLeft)
         {
             float frac = f.Health.Max > 0 ? f.Health.Current / f.Health.Max : 0f;
-            GUI.color = new Color(0f, 0f, 0f, 0.6f);
+            Fill(r, Color.black);
+            var inner = new Rect(r.x + 3 * u, r.y + 3 * u, r.width - 6 * u, r.height - 6 * u);
+            Fill(inner, new Color(0.35f, 0.05f, 0.05f));
+            float w = inner.width * frac;
+            Fill(new Rect(rightToLeft ? inner.xMax - w : inner.x, inner.y, w, inner.height),
+                Color.Lerp(new Color(0.85f, 0.2f, 0.15f), new Color(0.95f, 0.8f, 0.2f), frac));
+        }
+
+        private static void Fill(Rect r, Color c)
+        {
+            var old = GUI.color;
+            GUI.color = c;
             GUI.DrawTexture(r, Texture2D.whiteTexture);
-            GUI.color = Color.Lerp(new Color(0.85f, 0.2f, 0.15f), new Color(0.95f, 0.8f, 0.2f), frac);
-            float w = r.width * frac;
-            GUI.DrawTexture(new Rect(rightToLeft ? r.xMax - w : r.x, r.y, w, r.height), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GUI.Label(new Rect(r.x, r.yMax, r.width, 30 * u), f.stats != null ? f.stats.displayName : f.name, small);
+            GUI.color = old;
+        }
+
+        private static Texture2D bolt;
+
+        /// A yellow lightning bolt, drawn once into a small texture.
+        private static Texture2D BoltTexture()
+        {
+            if (bolt != null) return bolt;
+            const int w = 32, h = 64;
+            var pts = new[]
+            {
+                new Vector2(0.62f, 0f), new Vector2(0.12f, 0.56f), new Vector2(0.46f, 0.56f), new Vector2(0.28f, 1f),
+                new Vector2(0.9f, 0.4f), new Vector2(0.55f, 0.4f), new Vector2(0.8f, 0f),
+            };
+            bolt = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                // Texture rows start at the bottom; the outline is given top-down.
+                var p = new Vector2((x + 0.5f) / w, 1f - (y + 0.5f) / h);
+                px[y * w + x] = Inside(p, pts) ? new Color32(255, 214, 40, 255) : new Color32(0, 0, 0, 0);
+            }
+            bolt.SetPixels32(px);
+            bolt.Apply();
+            return bolt;
+        }
+
+        private static bool Inside(Vector2 p, Vector2[] poly)
+        {
+            bool inside = false;
+            for (int i = 0, j = poly.Length - 1; i < poly.Length; j = i++)
+            {
+                if ((poly[i].y > p.y) != (poly[j].y > p.y) &&
+                    p.x < (poly[j].x - poly[i].x) * (p.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x)
+                    inside = !inside;
+            }
+            return inside;
         }
 
         private void DrawButton(Rect layoutRect, string text)
@@ -295,6 +497,16 @@ namespace Bubba.Prototype
             big = new GUIStyle(label) { fontSize = Mathf.RoundToInt(40 * u), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             button = new GUIStyle(GUI.skin.button) { fontSize = Mathf.RoundToInt(22 * u), wordWrap = true };
             panel = new GUIStyle(GUI.skin.box) { padding = new RectOffset(16, 16, 16, 16) };
+            cardName = new GUIStyle(label) { fontSize = Mathf.RoundToInt(20 * u), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            cardName.normal.textColor = new Color(0.12f, 0.1f, 0.1f);
+            lockTag = new GUIStyle(cardName) { fontSize = Mathf.RoundToInt(16 * u) };
+            lockTag.normal.textColor = new Color(0.75f, 0.15f, 0.1f);
+            barName = new GUIStyle(label) { fontSize = Mathf.RoundToInt(20 * u), fontStyle = FontStyle.Bold, wordWrap = false };
+            badgeText = new GUIStyle(big) { fontSize = Mathf.RoundToInt(24 * u) };
+            timeLabel = new GUIStyle(small) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            timeLabel.normal.textColor = new Color(1f, 0.85f, 0.3f);
+            comboLabel = new GUIStyle(label) { fontSize = Mathf.RoundToInt(22 * u), fontStyle = FontStyle.Bold, wordWrap = false };
+            comboLabel.normal.textColor = new Color(0.6f, 0.85f, 1f);
         }
     }
 }

@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Bubba.Combat
 {
-    /// Runs a best-of-three match: countdown, 60-second rounds, KO or
+    /// Runs a best-of-three match: countdown, 3-minute rounds, KO or
     /// time-out, then reports the result to the server for points.
     public class RoundManager : MonoBehaviour
     {
@@ -18,7 +18,7 @@ namespace Bubba.Combat
         public FighterController enemy;
         public List<FighterStats> roster = new List<FighterStats>();
         public AbilityLibrary abilityLibrary;
-        public float roundSeconds = 60f;
+        public float roundSeconds = 180f; // 3:00, as on the fight-screen sketch
         public int roundsToWin = 2;
         public int maxRounds = 5;
         public float startX = 2.5f;

@@ -8,7 +8,7 @@ namespace Bubba.Backend
         public string displayName = "Fighter";
         public long fightPoints;
         public bool isPremium;
-        public string selectedFighter = "bear";
+        public string selectedFighter = "jacke";
         public List<string> equippedAbilities = new List<string>();
         public HashSet<string> ownedAbilities = new HashSet<string>();
     }

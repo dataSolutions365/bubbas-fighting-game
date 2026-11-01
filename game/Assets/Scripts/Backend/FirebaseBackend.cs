@@ -58,7 +58,7 @@ namespace Bubba.Backend
                 displayName = Get(data, "displayName", "Fighter"),
                 fightPoints = Convert.ToInt64(Get<object>(data, "fightPoints", 0L)),
                 isPremium = Get(data, "isPremium", false),
-                selectedFighter = Get(data, "selectedFighter", "bear"),
+                selectedFighter = Get(data, "selectedFighter", "jacke"),
                 equippedAbilities = Get<List<object>>(data, "equippedAbilities", new List<object>())
                     .Select(x => x.ToString()).ToList(),
                 ownedAbilities = new HashSet<string>(owned.Documents.Select(d => d.Id)),
