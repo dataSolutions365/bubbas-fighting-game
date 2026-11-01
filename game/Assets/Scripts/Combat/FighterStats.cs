@@ -8,7 +8,7 @@ namespace Bubba.Combat
     [CreateAssetMenu(menuName = "Bubba/Fighter Stats", fileName = "FighterStats")]
     public class FighterStats : ScriptableObject
     {
-        public string fighterId = "bear";
+        public string fighterId = "jacke";
         public string displayName = "Grizzly Bear";
 
         [Header("Body")]

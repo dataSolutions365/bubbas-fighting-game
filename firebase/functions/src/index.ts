@@ -29,7 +29,7 @@ const callableOptions = {
   region: process.env.FUNCTIONS_REGION || "us-central1",
 };
 
-const DEFAULT_FIGHTER = "bear";
+const DEFAULT_FIGHTER = "jacke";
 
 function requireUid(request: CallableRequest): string {
   if (!request.auth) {

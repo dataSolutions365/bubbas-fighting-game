@@ -13,6 +13,7 @@ prototype scope: [Animal Fighting Game: Plan](https://claude.ai/artifact/XfrVDDy
 | --- | --- |
 | `game/` | The Unity project. Game code is in `game/Assets/Scripts`. |
 | `firebase/` | Firestore security rules, Cloud Functions (points, shop, matches) and the starter catalog of fighters and abilities. |
+| `game/Assets/Resources/Roster/` | Portraits of the 12 fighters, cut from the hand-drawn "Choose Your Fighter" sheet. See [docs/roster.md](docs/roster.md) for names, ability ideas and what each still needs. |
 | `game/Assets/Resources/Monkey/` | The hand-drawn boxing monkey, colored, plus the same drawing cut into body parts. The prototype fight loads it from here (Unity only loads files by name from `Resources` folders). |
 | `prototypes/monkey-punch/` | Quick browser game tests (Phaser) using the monkey. Open any `.html` file in `games/` in a web browser. |
 | `ci/` | A compile check that lets GitHub build the C# scripts without Unity. |
@@ -53,7 +54,7 @@ In the Unity editor you can also use the keyboard: **A/D** move, **J** light, **
 2. Download this repo: clone it with GitHub Desktop or `git clone`, or use **Code > Download ZIP** on GitHub and extract it.
 3. In Unity Hub, choose **Add > Add project from disk** and pick the `game` folder. Choose Unity 6 if asked. On first open, Unity creates the rest of the project files (`ProjectSettings/`, `Packages/`), which you should commit.
 4. Create an empty scene (**File > New Scene > Basic**), add an empty GameObject, click **Add Component** and choose **Prototype Bootstrap**. Save the scene as `Assets/Scenes/Prototype.unity`.
-5. Press **Play**. You'll get a menu, a shop and a best-of-3 fight between two capsules that stand in for the bear and gorilla.
+5. Press **Play**. You'll get the "Choose Your Fighter" screen, a shop and a best-of-3 fight. Jacke the boxing monkey fights a blue CPU Jacke.
 
 Until Firebase is connected, the game uses an offline stand-in for the server, so you can play right away. Points then only last until you stop the game.
 
@@ -66,6 +67,19 @@ The prototype draws both fighters as the hand-drawn boxing monkey from `game/Ass
 For crisper edges, select the images in `Resources/Monkey` in Unity and set **Texture Type** to **Sprite (2D and UI)**.
 
 New characters work the same way. Each one needs a drawing on a full-size canvas, cut into body, head, front arm and back arm pieces that line up when stacked, plus the shoulder and neck pivot points.
+
+### Select screen and fight screen
+
+Both screens follow the hand-drawn sketches.
+
+- **Choose Your Fighter:** a grid of all 12 portraits. Tap a fighter to read their notes. Only fighters with fight art can be picked. The others are marked "needs drawing".
+- **Fight screen:**
+  - P1 and P2 badges, with long health bars across the top.
+  - A 3:00 round timer between two lightning bolts.
+  - The fighters' names and the rounds each has won, under the bars.
+  - COMBO meters in the bottom corners. A meter fills with each clean hit in a row and empties when the combo ends.
+
+To shorten rounds, change `roundSeconds` in `RoundManager`.
 
 ### Swapping in real animals
 

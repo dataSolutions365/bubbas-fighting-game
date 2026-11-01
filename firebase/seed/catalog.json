@@ -1,5 +1,12 @@
 {
   "fighters": {
+    "jacke": {
+      "name": "Jacke",
+      "species": "Boxing monkey",
+      "baseStats": { "health": 1100, "speed": 1.1, "power": 1.2 },
+      "premiumOnly": false,
+      "enabled": true
+    },
     "bear": {
       "name": "Grizzly Bear",
       "species": "Ursus arctos horribilis",

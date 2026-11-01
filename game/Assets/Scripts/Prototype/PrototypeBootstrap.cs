@@ -12,7 +12,7 @@ namespace Bubba.Prototype
     /// coloured capsules until real animal models replace them.
     public class PrototypeBootstrap : MonoBehaviour
     {
-        [Tooltip("Optional. Leave empty to use the built-in bear and gorilla numbers.")]
+        [Tooltip("Optional. Leave empty to use the built-in Jacke numbers.")]
         public FighterStats[] roster;
         [Tooltip("Optional. Leave empty to use the built-in ability set.")]
         public AbilityLibrary abilityLibrary;
@@ -39,8 +39,10 @@ namespace Bubba.Prototype
             if (roster != null && roster.Length > 0) rounds.roster.AddRange(roster);
             else
             {
-                rounds.roster.Add(DefaultStats("bear", "Grizzly Bear", 1200f, 2.8f, 1.3f));
-                rounds.roster.Add(DefaultStats("gorilla", "Silverback Gorilla", 1000f, 3.5f, 1.1f));
+                // Jacke is the only fighter with art so far, so the CPU fights as a
+                // blue Jacke. Others join as their full-body drawings come in
+                // (see RosterCatalog for the whole sheet).
+                rounds.roster.Add(DefaultStats("jacke", "Jacke", 1100f, 3.2f, 1.2f));
             }
             player.stats = rounds.roster[0];
             enemy.stats = rounds.roster[rounds.roster.Count > 1 ? 1 : 0];
